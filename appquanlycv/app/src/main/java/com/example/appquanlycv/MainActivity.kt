@@ -1,47 +1,67 @@
 package com.example.appquanlycv
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.activity.viewModels
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.appquanlycv.reminder.TaskReminderScheduler
+import com.example.appquanlycv.ui.home.TaskScreen
+import com.example.appquanlycv.ui.home.TaskViewModel
+import com.example.appquanlycv.ui.home.TaskViewModelFactory
 import com.example.appquanlycv.ui.theme.AppquanlycvTheme
 
 class MainActivity : ComponentActivity() {
+
+    private val viewModel: TaskViewModel by viewModels {
+        TaskViewModelFactory(
+            (application as TaskApplication).repository,
+            TaskReminderScheduler(applicationContext)
+        )
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        requestNotificationPermissionIfNeeded()
         setContent {
             AppquanlycvTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+                val uiState = viewModel.uiState.collectAsStateWithLifecycle()
+                TaskScreen(
+                    uiState = uiState.value,
+                    onAddTask = viewModel::addTask,
+                    onSelectDate = viewModel::selectDate,
+                    onToggleCompletion = viewModel::toggleCompletion,
+                    onToggleReminder = viewModel::toggleReminder,
+                    onDeleteTask = viewModel::deleteTask
+                )
             }
         }
     }
-}
 
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val hasPermission = ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!hasPermission) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    NOTIFICATION_PERMISSION_REQUEST
+                )
+            }
+        }
+    }
 
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    AppquanlycvTheme {
-        Greeting("Android")
+    companion object {
+        private const val NOTIFICATION_PERMISSION_REQUEST = 1001
     }
 }
