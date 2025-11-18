@@ -65,6 +65,7 @@ import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
 import java.util.Locale
 
+
 @Composable
 fun TaskScreen(
     uiState: TaskUiState,
@@ -207,21 +208,29 @@ private fun SummaryRow(weekCount: Int, monthCount: Int) {
             value = weekCount,
             gradient = Brush.verticalGradient(
                 listOf(Color(0xFFFFE5F1), Color(0xFFFFF2FA))
-            )
+            ),
+            modifier = Modifier.weight(1f)
         )
         SummaryCard(
             title = "Ngày bận trong tháng",
             value = monthCount,
             gradient = Brush.verticalGradient(
                 listOf(Color(0xFFE5F1FF), Color(0xFFF2F8FF))
-            )
+            ),
+            modifier = Modifier.weight(1f)
         )
     }
 }
 
+
 @Composable
-private fun SummaryCard(title: String, value: Int, gradient: Brush) {
-    Card(modifier = Modifier.weight(1f), shape = MaterialTheme.shapes.medium) {
+private fun SummaryCard(
+    title: String,
+    value: Int,
+    gradient: Brush,
+    modifier: Modifier = Modifier
+) {
+    Card(modifier = modifier, shape = MaterialTheme.shapes.medium) {
         Column(
             modifier = Modifier
                 .background(gradient)
@@ -237,6 +246,7 @@ private fun SummaryCard(title: String, value: Int, gradient: Brush) {
         }
     }
 }
+
 
 @Composable
 private fun WeekDateSelector(
