@@ -1,5 +1,6 @@
 package com.example.appquanlycv.ui.home
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -38,9 +39,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,9 +49,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import com.example.appquanlycv.R
 import com.example.appquanlycv.data.Task
 import java.time.DayOfWeek
 import java.time.Instant
@@ -110,6 +116,7 @@ fun TaskScreen(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                RemindMeBrandCard()
                 CatGreetingCard(selectedDate = uiState.selectedDate, taskCount = uiState.tasksForSelectedDate.size)
                 SummaryRow(
                     weekCount = uiState.daysWithTasksInWeek,
@@ -137,6 +144,51 @@ fun TaskScreen(
                 showAddDialog = false
             }
         )
+    }
+}
+
+@Composable
+private fun RemindMeBrandCard() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large
+    ) {
+        Row(
+            modifier = Modifier
+                .background(Color(0xFF201A30))
+                .padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Surface(
+                shape = MaterialTheme.shapes.extraLarge,
+                color = Color.White.copy(alpha = 0.15f)
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.ic_cat_notification),
+                    contentDescription = "Logo remindme",
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "remindme",
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White
+                    )
+                )
+                Text(
+                    text = "Trợ lý nhắc việc dễ thương cho bạn",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = Color.White.copy(alpha = 0.8f),
+                        fontStyle = FontStyle.Italic
+                    ),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
     }
 }
 
@@ -442,19 +494,18 @@ private fun AddTaskDialog(
     onSave: (String, String, Long, Boolean) -> Unit
 ) {
     val zoneId = remember { ZoneId.systemDefault() }
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault()) }
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
-    var selectedTime by remember { mutableStateOf(LocalTime.now().truncatedTo(ChronoUnit.MINUTES)) }
+    val initialTime = remember { LocalTime.now().truncatedTo(ChronoUnit.MINUTES) }
+    var timeInput by remember { mutableStateOf(initialTime.format(timeFormatter)) }
+    var timeInputError by remember { mutableStateOf(false) }
     var reminderEnabled by remember { mutableStateOf(true) }
     var showDatePicker by remember { mutableStateOf(false) }
-    var showTimePicker by remember { mutableStateOf(false) }
 
     val dateLabel = remember(selectedDate) {
         selectedDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale.getDefault()))
-    }
-    val timeLabel = remember(selectedTime) {
-        selectedTime.format(DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault()))
     }
 
     if (showDatePicker) {
@@ -482,44 +533,23 @@ private fun AddTaskDialog(
         }
     }
 
-    if (showTimePicker) {
-        val timeState = rememberTimePickerState(
-            initialHour = selectedTime.hour,
-            initialMinute = selectedTime.minute,
-            is24Hour = true
-        )
-        AlertDialog(
-            onDismissRequest = { showTimePicker = false },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        selectedTime = LocalTime.of(timeState.hour, timeState.minute)
-                        showTimePicker = false
-                    }
-                ) { Text("Chọn") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showTimePicker = false }) { Text("Hủy") }
-            },
-            title = { Text("Chọn giờ nhắc") },
-            text = {
-                TimePicker(state = timeState)
-            }
-        )
-    }
-
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
             TextButton(
                 onClick = {
-                    val dateTime = LocalDateTime.of(selectedDate, selectedTime)
-                    onSave(
-                        title,
-                        description,
-                        dateTime.atZone(zoneId).toInstant().toEpochMilli(),
-                        reminderEnabled
-                    )
+                    val parsedTime = runCatching { LocalTime.parse(timeInput, timeFormatter) }.getOrNull()
+                    if (parsedTime == null) {
+                        timeInputError = true
+                    } else {
+                        val dateTime = LocalDateTime.of(selectedDate, parsedTime)
+                        onSave(
+                            title,
+                            description,
+                            dateTime.atZone(zoneId).toInstant().toEpochMilli(),
+                            reminderEnabled
+                        )
+                    }
                 },
                 enabled = title.isNotBlank()
             ) {
@@ -565,21 +595,31 @@ private fun AddTaskDialog(
                             Text(dateLabel, color = Color(0xFF3A1D5D))
                         }
                     }
-                    Surface(
+                    OutlinedTextField(
+                        value = timeInput,
+                        onValueChange = { value ->
+                            val digitsOnly = value.filter { it.isDigit() }.take(4)
+                            timeInput = when {
+                                digitsOnly.length <= 2 -> digitsOnly
+                                else -> digitsOnly.substring(0, 2) + ":" + digitsOnly.substring(2)
+                            }
+                            timeInputError = false
+                        },
                         modifier = Modifier.weight(1f),
-                        shape = MaterialTheme.shapes.medium,
-                        color = Color(0xFFE5F1FF),
-                        tonalElevation = 0.dp
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .clickable { showTimePicker = true }
-                                .padding(12.dp)
-                        ) {
-                            Text("Giờ", color = Color(0xFF6C4A93), fontWeight = FontWeight.SemiBold)
-                            Text(timeLabel, color = Color(0xFF3A1D5D))
+                        label = { Text("Giờ (HH:mm)") },
+                        placeholder = { Text("Ví dụ: 08:30") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Number,
+                            imeAction = ImeAction.Done
+                        ),
+                        isError = timeInputError,
+                        supportingText = {
+                            if (timeInputError) {
+                                Text("Vui lòng nhập giờ hợp lệ theo định dạng HH:mm")
+                            }
                         }
-                    }
+                    )
                 }
                 ReminderSelector(
                     enabled = reminderEnabled,
